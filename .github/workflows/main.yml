@@ -1,8 +1,15 @@
+name: AWS Key Expiry Reminder
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 9 * * *' # Runs every day at 9:00 UTC
+
 env:
   SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
 
 jobs:
-  build:
+  notify:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -16,5 +23,5 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run script
+      - name: Run AWS Key Expiry Reminder
         run: python3 expiration_reminder_and_automation.py
