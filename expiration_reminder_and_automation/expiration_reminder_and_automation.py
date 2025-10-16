@@ -2,7 +2,10 @@ import boto3
 import json
 import datetime
 import requests
+import os
 from dateutil import parser
+
+slack_webhook = os.environ.get('SLACK_WEBHOOK')
 
 def send_slack_notification(message, webhook_url):
     payload = {"text": message}
@@ -28,13 +31,25 @@ def check_aws_key(reminder_days, webhook_url):
                 msg = f"🔐 AWS Key for *{username}* will expire in {expiry_days} days. ({key_id})"
                 send_slack_notification(msg, webhook_url)
 
+# def main():
+#     with open('config.json') as f:
+#         config = json.load(f)
+
+#     check_aws_key(
+#         reminder_days=config['reminder_days'],
+#         webhook_url=config['slack_webhook']
+#     )
+
 def main():
     with open('config.json') as f:
         config = json.load(f)
 
+    if not slack_webhook:
+        raise ValueError("SLACK_WEBHOOK environment variable not set.")
+
     check_aws_key(
         reminder_days=config['reminder_days'],
-        webhook_url=config['slack_webhook']
+        webhook_url=slack_webhook
     )
 
 if __name__ == "__main__":
