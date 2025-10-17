@@ -1,16 +1,18 @@
-name: AWS Key Expiry Reminder
+name: AWS Key Expiry Reminder & Compliance Check
 
 on:
-  workflow_dispatch:
-  schedule:
-    - cron: '0 9 * * *' # Runs every day at 9:00 UTC
+  workflow_dispatch:       # Manual trigger
+  # schedule:
+  #   - cron: '0 9 * * *'    # Every day at 9:00 UTC
 
 env:
   SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
 
 jobs:
-  notify:
+  aws_key_expiry:
+    name: AWS Key Expiry Reminder
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -24,4 +26,24 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Run AWS Key Expiry Reminder
-        run: python3 expiration_reminder_and_automation.py
+        run: python3 expiration_reminder_and_automation/expiration_reminder_and_automation.py
+
+  compliance_check:
+    name: Compliance Check
+    runs-on: ubuntu-latest
+    needs: aws_key_expiry   # Runs after the expiry reminder completes
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Compliance Check Script
+        run: python3 compliance-check/compliance_check.py
