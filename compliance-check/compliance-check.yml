@@ -1,0 +1,88 @@
+import boto3
+import requests
+import os
+
+# AWS config
+REGION = "us-west-2"
+PROFILE = "default"   # change to your AWS profile
+REQUIRED_TAGS = ["Name", "Environment", "Owner"]
+
+# Slack config
+slack_webhook = os.environ.get('SLACK_WEBHOOK')
+
+# Initialize boto3 session
+session = boto3.Session(profile_name=PROFILE, region_name=REGION)
+
+
+def send_slack_alert(message: str):
+    """Send alert to Slack channel"""
+    payload = {"text": f":rotating_light: *AWS Tag Compliance Alert* :rotating_light:\n{message}"}
+    try:
+        response = requests.post(slack_webhook, json=payload)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        print(f"Failed to send Slack message: {e}")
+
+
+def check_tags(resource_id, tags):
+    """Check if required tags exist"""
+    if not tags:
+        return {resource_id: "No tags found"}
+    missing = [t for t in REQUIRED_TAGS if t not in [tag["Key"] for tag in tags]]
+    if missing:
+        return {resource_id: f"Missing tags: {', '.join(missing)}"}
+    return None
+
+
+def check_ec2():
+    ec2 = session.client("ec2")
+    instances = ec2.describe_instances()
+    findings = []
+    for reservation in instances["Reservations"]:
+        for instance in reservation["Instances"]:
+            result = check_tags(instance["InstanceId"], instance.get("Tags", []))
+            if result:
+                findings.append(result)
+    return findings
+
+
+# def check_s3():
+#     s3 = session.client("s3")
+#     findings = []
+#     buckets = s3.list_buckets()["Buckets"]
+#     for bucket in buckets:
+#         try:
+#             tags = s3.get_bucket_tagging(Bucket=bucket["Name"])["TagSet"]
+#         except Exception:
+#             tags = []
+#         result = check_tags(bucket["Name"], tags)
+#         if result:
+#             findings.append(result)
+#     return findings
+
+
+# def check_rds():
+#     rds = session.client("rds")
+#     findings = []
+#     dbs = rds.describe_db_instances()["DBInstances"]
+#     for db in dbs:
+#         arn = db["DBInstanceArn"]
+#         tags = rds.list_tags_for_resource(ResourceName=arn)["TagList"]
+#         result = check_tags(db["DBInstanceIdentifier"], tags)
+#         if result:
+#             findings.append(result)
+#     return findings
+
+
+if __name__ == "__main__":
+    report = []
+    report.extend(check_ec2())
+    # report.extend(check_s3())
+    # report.extend(check_rds())
+
+    if report:
+        msg = "\n".join([f"{list(r.keys())[0]} → {list(r.values())[0]}" for r in report])
+        print("🚨 Non-compliant resources found:\n", msg)
+        send_slack_alert(msg)
+    else:
+        print("✅ All resources are properly tagged.")
